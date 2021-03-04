@@ -1,32 +1,62 @@
 /*
     IMBUILDINGS Payload decoder for The Things Network
     ===========================================================
-    Version  : 1.0
-    Author   : Ronald Conen
+    Version  : 1.1
+    Author   : Ronald Conen - IMBUILDINGS B.V.
 */
+
+var portBasedDecoding = false;
+var standardPort = 1;
+
+var portDecodingScheme = {};
+
+//Define port decoding rules
+portDecodingScheme[26] = {
+    metaDataEnable: false,
+    payload_type: 2,
+    payload_variant: 6
+}
+
+portDecodingScheme[27] = {
+    metaDataEnable: false,
+    payload_type: 2,
+    payload_variant: 7
+}
 
 function Decoder(bytes, port){
     var decoded = {};
+    var portDecoding = undefined;
 
-    if(bytes.length > 2){
+    if(bytes.length > 2 || portBasedDecoding === true){
         var payload_type = bytes[0];
+
+        //Setup port decoding unless the standardport is used
+        if(port != standardPort && portBasedDecoding === true && portDecodingScheme[port] != undefined){
+            //Load port decoding rule according to port number
+            portDecoding = portDecodingScheme[port];
+            if(portDecoding.metaDataEnable === false){
+
+                //Payload type not in payload when metaData is disabled
+                payload_type = portDecoding.payload_type;   //get payload type according to port decoding scheme
+            }
+        }
 
         switch(payload_type){
             case 1:
                 //Comfort Sensor
-                decoded = parseComfortSensor(bytes);
+                decoded = parseComfortSensor(bytes, portDecoding);
                 break;
             case 2:
                 //People Counter
-                decoded = parsePeopleCounter(bytes);
+                decoded = parsePeopleCounter(bytes, portDecoding);
                 break;
             case 3:
                 //Button
-                decoded = parseButton(bytes);
+                decoded = parseButton(bytes, portDecoding);
                 break;
             case 4:
                 //Pulse Counter
-                decoded = parsePulseCounter(bytes);
+                decoded = parsePulseCounter(bytes, portDecoding);
                 break;
         }
     }
@@ -80,7 +110,7 @@ function readInt8(payload, index){
     return int8;
 }
 
-function parseComfortSensor(payload){
+function parseComfortSensor(payload, portDecoding){
     var payload_variant = payload[1];
 
     var deviceData = {
@@ -96,10 +126,10 @@ function parseComfortSensor(payload){
     switch(payload_variant){
         case 1:     //NB-IoT Payload
             if(payload.length != 19) return {};
-            deviceData.temperature = readInt16BE(payload, 12) / 100;
-            deviceData.humidity = readUInt16BE(payload, 14) / 100;
-            deviceData.presence = payload[18];
-            deviceData.co2 = readUInt16BE(payload,16);
+            deviceData.temperature = readInt16BE(payload, payload.length - 7) / 100;
+            deviceData.humidity = readUInt16BE(payload, payload.length - 5) / 100;
+            deviceData.presence = payload[payload.length - 1];
+            deviceData.co2 = readUInt16BE(payload, payload.length - 3);
             return deviceData;
         case 2:     //NB-IoT Payload
             if(payload.length != 25) return {};
@@ -113,32 +143,53 @@ function parseComfortSensor(payload){
             //     0
             // );
             // deviceData.datetime = datetime.toISOString();        //Not supported on TTN
-            deviceData.temperature = readInt16BE(payload, 19) / 100;
-            deviceData.humidity = readUInt16BE(payload, 21) / 100;
-            deviceData.presence = payload[25];
-            deviceData.co2 = readUInt16BE(payload, 23);
+            deviceData.temperature = readInt16BE(payload, payload.length - 7) / 100;
+            deviceData.humidity = readUInt16BE(payload, payload.length - 5) / 100;
+            deviceData.presence = payload[payload.length - 1];
+            deviceData.co2 = readUInt16BE(payload, payload.length - 3);
             return deviceData;
         case 3:
-            //To be implemented
+            if(payload.length != 20) return {};
+            deviceData.device_id = toHEXString(payload, 2, 8);
+            deviceData.device_status = payload[10];
+            deviceData.battery_voltage = readUInt16BE(payload, 11) / 100;
+            delete deviceData.rssi;
+            deviceData.temperature = readUInt16BE(payload, payload.length - 7) / 100;
+            deviceData.humidity = readUInt16BE(payload, payload.length - 5) / 100;
+            deviceData.presence = payload[payload.length - 1];
+            deviceData.co2 = readUInt16BE(payload, payload.length - 3);
+            //deviceData.pressure = readUInt16BE(payload , 20);
+            //deviceData.ligth = //To be implemented
             return deviceData;
     }
 
     return {};
 }
 
-function parsePeopleCounter(payload){
+function parsePeopleCounter(payload, portDecoding){
+    var indexOrigin = 0;
+    var deviceData = {};
+    var parseMetaData = true;
     var payload_variant = payload[1];
 
-    var deviceData = {
+
+    if(portDecoding != undefined){
+        payload_variant = portDecoding.payload_variant;
+        parseMetaData = portDecoding.metaDataEnable;
+    }
+
+    
+    var deviceData = {};
+    if(parseMetaData === true){
         //received_at: new Date().toISOString(),        //Not supported on TTN
-        device_type_identifier: payload[0],
-        device_type: 'People Counter',
-        device_type_variant: payload[1],
-        device_id: toHEXString(payload, 2, 6),
-        device_status: payload[8],
-        battery_voltage: readUInt16BE(payload, 9) / 100,
-        rssi: readInt8(payload, 11)
-    };
+        deviceData.device_type_identifier = payload[0],
+        deviceData.device_type = 'People Counter',
+        deviceData.device_type_variant = payload[1],
+        deviceData.device_id = toHEXString(payload, 2, 6),
+        deviceData.device_status = payload[8],
+        deviceData.battery_voltage = readUInt16BE(payload, 9) / 100,
+        deviceData.rssi = readInt8(payload, 11)
+    }
 
     switch(payload_variant){
         case 1:     //NB-IoT People Counter payload
@@ -146,15 +197,15 @@ function parsePeopleCounter(payload){
             break;
         case 2:     //NB-IoT People Counter payload
             if(payload.length != 15) return {};
-            deviceData.counter_a = payload[12];
-            deviceData.counter_b = payload[13];
-            deviceData.sensor_status = payload[14];
+            deviceData.counter_a = payload[payload.length - 3];
+            deviceData.counter_b = payload[payload.length - 2];
+            deviceData.sensor_status = payload[payload.length - 1];
             return deviceData;
         case 3:     //NB-IoT People Counter payload
             if(payload.length != 17) return {};
-            deviceData.counter_a = readUInt16BE(payload, 12);
-            deviceData.counter_b = readUInt16BE(payload, 14);
-            deviceData.sensor_status = payload[16];
+            deviceData.counter_a = readUInt16BE(payload, payload.length - 5);
+            deviceData.counter_b = readUInt16BE(payload, payload.length - 3);
+            deviceData.sensor_status = payload[payload.length - 1];
             return deviceData;
         case 4:     //NB-IoT People Counter payload
             if(payload.length != 24) return {};
@@ -168,9 +219,9 @@ function parsePeopleCounter(payload){
             //     0
             // );
             // deviceData.datetime = datetime.toISOString();        //Not supported on TTN
-            deviceData.counter_a = readUInt16BE(payload, 19);
-            deviceData.counter_b = readUInt16BE(payload, 21);
-            deviceData.sensor_status = payload[23];
+            deviceData.counter_a = readUInt16BE(payload, payload.length - 5);
+            deviceData.counter_b = readUInt16BE(payload, payload.length - 3);
+            deviceData.sensor_status = payload[payload.length - 1];
             return deviceData;
         case 5:     //LoRaWAN People Counter payload
             if(payload.length != 19) return {};
@@ -178,33 +229,50 @@ function parsePeopleCounter(payload){
             deviceData.device_status = payload[10];
             deviceData.battery_voltage = readUInt16BE(payload, 11) / 100;
             delete deviceData.rssi;
-            deviceData.counter_a = readUInt16BE(payload, 13);
-            deviceData.counter_b = readUInt16BE(payload, 15);
-            deviceData.sensor_status = payload[17];
-            deviceData.payload_counter = payload[18];
+            deviceData.counter_a = readUInt16BE(payload, payload.length - 6);
+            deviceData.counter_b = readUInt16BE(payload, payload.length - 4);
+            deviceData.sensor_status = payload[payload.length - 2];
+            deviceData.payload_counter = payload[payload.length - 1];
             return deviceData;
         case 6:     //LoRaWAN People Counter payload
-            if(payload.length != 23) return {};
-            deviceData.device_id = toHEXString(payload, 2, 8);
-            deviceData.device_status = payload[10];
-            deviceData.battery_voltage = readUInt16BE(payload, 11) / 100;
-            delete deviceData.rssi;
-            deviceData.counter_a = readUInt16BE(payload, 13);
-            deviceData.counter_b = readUInt16BE(payload, 15);
-            deviceData.sensor_status = payload[17];
-            deviceData.total_counter_a = readUInt16BE(payload, 18);
-            deviceData.total_counter_b = readUInt16BE(payload, 20);
-            deviceData.payload_counter = payload[22];
+            if(payload.length != 23 && parseMetaData === true) return {};
+            if(parseMetaData === true){
+                deviceData.device_id = toHEXString(payload, 2, 8);
+                delete deviceData.rssi;
+
+                indexOrigin = 10;
+            }
+
+            deviceData.device_status = payload[payload.length - 13];
+            deviceData.battery_voltage = readUInt16BE(payload, payload.length - 12) / 100;
+            deviceData.counter_a = readUInt16BE(payload, payload.length - 10);
+            deviceData.counter_b = readUInt16BE(payload, payload.length - 8);
+            deviceData.sensor_status = payload[payload.length - 6];
+            deviceData.total_counter_a = readUInt16BE(payload, payload.length - 5);
+            deviceData.total_counter_b = readUInt16BE(payload, payload.length - 3);
+            deviceData.payload_counter = payload[payload.length - 1];
             return deviceData;
         case 7:     //LoRaWAN People Counter
-            //To be implemented
+            if(parseMetaData === true){
+                deviceData.device_id = toHEXString(payload, 2, 8);
+                deviceData.device_status = payload[10];
+                deviceData.battery_voltage = readUInt16BE(payload, 11) / 100;
+                delete deviceData.rssi;
+                
+                indexOrigin = 10;
+            }
+
+            deviceData.sensor_status = payload[payload.length - 5];
+            deviceData.total_counter_a = readUInt16BE(payload, payload.length - 4);
+            deviceData.total_counter_b = readUInt16BE(payload, payload.length - 2);
+
             return deviceData;
     }
 
     return {};
 }
 
-function parseButton(payload){
+function parseButton(payload, portDecoding){
     var payload_variant = payload[1];
 
     var deviceData = {
@@ -243,7 +311,7 @@ function parseButton(payload){
     return {};
 }
 
-function parsePulseCounter(payload){
+function parsePulseCounter(payload, portDecoding){
     var payload_variant = payload[1];
 
     var deviceData = {
