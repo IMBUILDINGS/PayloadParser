@@ -1,3 +1,7 @@
+//deprecated
+//This file will not be maintained anymore
+//This file will be removed in a next release
+
 const moment = require('moment');
 
 function bcd(dec) {

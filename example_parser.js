@@ -1,3 +1,7 @@
+//deprecated
+//This file will not be maintained anymore
+//This file will be removed in a next release
+
 //To parse the data into a JSON object call the parse function
 //Pass the data as a Buffer to the parse function
 //Returns JSON object or false when the payload can not be parsed successfully

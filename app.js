@@ -1,15 +1,8 @@
 'use strict';
-let structureLibrary;
+let parser = require('./ttn-v3/imbuildings-decoder');
 let config = {
 	arguments: {}
 }
-
-function reloadLibrary() {
-	delete require.cache[require.resolve('./structurelibrary.js')];;
-	structureLibrary = require('./structurelibrary.js');
-}
-
-reloadLibrary();
 
 function getArguments(){
     config.arguments = {};
@@ -29,8 +22,11 @@ function getArguments(){
 getArguments();
 
 if(config.arguments.payload){
-	console.log(`Translating payload: ${config.arguments.payload} as buffer...\r\n`)
-	let parsedData = structureLibrary.parse(Buffer.from(config.arguments.payload,'HEX'))
+    console.log(`Translating payload: ${config.arguments.payload} as buffer...\r\n`)
+    
+    let input = {fPort: config.arguments.fport, bytes: Buffer.from(config.arguments.payload,'hex')};
+    let parsedData = parser.decode(input);
+
 	if(parsedData){
 		console.log(parsedData);
 	}else{
