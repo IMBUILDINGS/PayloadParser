@@ -25,7 +25,19 @@ const settingIdentifier = {
     CONFIRMED_MESSAGES:             0x2F,
     FPORT:                          0x33,
     FPORT_HEARTBEAT:                0x36,
+    OOC_DISTANCE:                   0x50,
+    LED_INDICATION:                 0x51,
+    BUTTON_DELAY_TIME:              0x52,
+    DEVICE_COMMANDS:                0xC8,
     ERRORS:                         0xF0
+}
+
+const command = {
+    GET_PAYLOAD:                    0x01,
+    REJOIN:                         0x02,
+    COUNTER_PRESET:                 0x03,
+    SAVE:                           0x04,
+    BUTTON_PRESET:                  0x05
 }
 
 function decodeUplink(input){
@@ -33,7 +45,7 @@ function decodeUplink(input){
 
     if(!containsIMBHeader(input.bytes)){
         //When payload doesn't contain IMBuildings header
-        //Assumes that payload is transmitted on specific fport
+        //Assumes that payload is transmitted on specific recommended fport
         //e.g. payload type 2 variant 6 on FPort 26, type 2 variant 7 on FPort 27 and so on...
         switch(input.fPort){
             case 10:
@@ -65,7 +77,16 @@ function decodeUplink(input){
 
                 parsedData.payload_type = payloadTypes.PEOPLE_COUNTER;
                 parsedData.payload_variant = 8;
-
+                break;
+            case 33:
+                if(input.bytes.length != 14) return getError(errorCode.UNKNOWN_PAYLOAD);
+                parsedData.payload_type = payloadTypes.BUTTONS;
+                parsedData.payload_variant = 3;
+                break;
+            case 34:
+                if(input.bytes.length != 23) return getError(errorCode.UNKNOWN_PAYLOAD);
+                parsedData.payload_type = payloadTypes.BUTTONS;
+                parsedData.payload_variant = 4;
                 break;
             default:
                 return { errors: []};
@@ -80,6 +101,7 @@ function decodeUplink(input){
         case payloadTypes.COMFORT_SENSOR: parseComfortSensor(input, parsedData); break;
         case payloadTypes.PEOPLE_COUNTER: parsePeopleCounter(input, parsedData); break;
         case payloadTypes.DOWNLINK:       parsedData = parseDownlinkResponse(input.bytes); break;
+        case payloadTypes.BUTTONS:        parseButtons(input, parsedData); break;
         default:
             return getError(errorCode.UNKNOWN_PAYLOAD_TYPE);
     }
@@ -93,6 +115,8 @@ function containsIMBHeader(payload){
     if(payload[0] == payloadTypes.PEOPLE_COUNTER && payload[1] == 0x06 && payload.length == 23) return true;
     if(payload[0] == payloadTypes.PEOPLE_COUNTER && payload[1] == 0x07 && payload.length == 15) return true;
     if(payload[0] == payloadTypes.PEOPLE_COUNTER && payload[1] == 0x08 && payload.length == 14) return true;
+    if(payload[0] == payloadTypes.BUTTONS && payload[1] == 0x03 && payload.length == 14) return true;
+    if(payload[0] == payloadTypes.BUTTONS && payload[1] == 0x04 && payload.length == 23) return true;
 
     return false;
 }
@@ -136,75 +160,33 @@ function parsePeopleCounter(input, parsedData){
     }
 }
 
-function parseDownlinkResponse(payload){
-    let parsedResponse = {};
-
-    let i = 2;
-    while( i < payload.length){
-        switch(payload[i + 1]){
-            case settingIdentifier.DEVICE_ID:
-                parsedResponse.device_id = toHEXString(payload, i + 2, 8);
-                break;
-            case settingIdentifier.INTERVAL:
-                parsedResponse.interval = payload[i + 2];
-                break;
-            case settingIdentifier.EVENT_SETTING:
-                parsedResponse.event = {
-                    type: payload[i + 2],
-                    count: payload[i + 3],
-                    timeout: payload[i + 4]
-                }
-                break;
-            case settingIdentifier.PAYLOAD_DEFINITION:
-                parsedResponse.payload = {
-                    type: payload[i + 2],
-                    variant: payload[i + 3],
-                    header: (payload[i + 4] == 0x01) ? true : false
-                }
-                break;
-            case settingIdentifier.HEARTBEAT_INTERVAL:
-                if(parsedResponse.heartbeat === undefined){
-                    parsedResponse.heartbeat = {};
-                }
-
-                parsedResponse.heartbeat.interval = payload[i + 2];
-                break;
-            case settingIdentifier.HEARTBEAT_PAYLOAD_DEFINITION:
-                if(parsedResponse.heartbeat === undefined){
-                    parsedResponse.heartbeat = {};
-                }
-
-                parsedResponse.heartbeat.payload = {
-                    type: payload[i + 2],
-                    variant: payload[i + 3],
-                    header: (payload[i + 4] == 0x01) ? true : false
-                }
-                break;
-            case settingIdentifier.DEVICE_ADDRESS:
-                parsedResponse.device_address = toHEXString(payload, i + 2, 4);
-                break;
-            case settingIdentifier.CONFIRMED_MESSAGES:
-                parsedResponse.confirmed_messages = payload[i + 2];
-                break;
-            case settingIdentifier.FPORT:
-                parsedResponse.fport = payload[i + 2];
-                break;
-            case settingIdentifier.FPORT_HEARTBEAT:
-                if(parsedResponse.heartbeat === undefined){
-                    parsedResponse.heartbeat = {};
-                }
-
-                parsedResponse.heartbeat.fport = payload[i + 2];
-                break;
-        }
-
-        i += payload[i];
+function parseButtons(input, parsedData){
+    switch(parsedData.payload_variant){
+        case 0x03:
+            parsedData.device_status = input.bytes[input.bytes.length - 4];
+            parsedData.battery_voltage = readUInt16BE(input.bytes, input.bytes.length - 3) / 100;
+            parsedData.button_pressed = (input.bytes[input.bytes.length - 1] != 0) ? true : false;
+            parsedData.button = {
+                a: (input.bytes[input.bytes.length - 1] & 0x01 == 0x01) ? true : false,
+                b: (input.bytes[input.bytes.length - 1] & 0x02 == 0x02) ? true : false,
+                c: (input.bytes[input.bytes.length - 1] & 0x04 == 0x04) ? true : false,
+                d: (input.bytes[input.bytes.length - 1] & 0x08 == 0x08) ? true : false,
+                e: (input.bytes[input.bytes.length - 1] & 0x10 == 0x10) ? true : false
+            }
+            break;
+        case 0x04:
+            parsedData.device_status = input.bytes[input.bytes.length - 13];
+            parsedData.battery_voltage = readUInt16BE(input.bytes, input.bytes.length - 12) / 100;
+            parsedData.button = {
+                a: readUInt16BE(input.bytes, input.bytes.length - 10),
+                b: readUInt16BE(input.bytes, input.bytes.length - 8),
+                c: readUInt16BE(input.bytes, input.bytes.length - 6),
+                d: readUInt16BE(input.bytes, input.bytes.length - 4),
+                e: readUInt16BE(input.bytes, input.bytes.length - 2)
+            }
+            break;
     }
-
-    return parsedResponse;
 }
-
-
 
 //Helper functions
 function getError(code){
