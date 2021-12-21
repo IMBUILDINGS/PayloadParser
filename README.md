@@ -4,7 +4,7 @@ Example library for parsing payload for IMBUILDINGS LoRaWAN and NB-IoT Products
 Please note that the following files using Node JS Buffer objects
 - structurelibrary.js
 - example_parser.js
-*Above files are deprecated and will be removed from this repo in a next release*
+*Above files are deprecated and will be removed from this repository in a next release*
 
 App.js uses the TTN V3 IMBuildings decoder
 Run App.js with the `--payload=` argument. This argument requires a hex string
@@ -27,6 +27,9 @@ Run App.js with the `--payload=` argument. This argument requires a hex string
     payload_counter: 97 
 }
 ```
+
+It is also possible to decode a Base64 string by using `--base64=` instead of `--payload=`.
+For payloads without header information the `--fport=` argument can be used. This will trigger port based decoding as a LoRaWAN function.
 
 ---
 
