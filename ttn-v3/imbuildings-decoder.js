@@ -42,7 +42,6 @@ const command = {
 
 function decodeUplink(input){
     let parsedData = {};
-
     if(!containsIMBHeader(input.bytes)){
         //When payload doesn't contain IMBuildings header
         //Assumes that payload is transmitted on specific recommended fport
@@ -79,14 +78,16 @@ function decodeUplink(input){
                 parsedData.payload_variant = 8;
                 break;
             case 33:
-                if(input.bytes.length != 14) return getError(errorCode.UNKNOWN_PAYLOAD);
+                if(input.bytes.length != 1) return getError(errorCode.UNKNOWN_PAYLOAD);
                 parsedData.payload_type = payloadTypes.BUTTONS;
                 parsedData.payload_variant = 3;
+                input.payloadHeader = false;
                 break;
             case 34:
-                if(input.bytes.length != 23) return getError(errorCode.UNKNOWN_PAYLOAD);
+                if(input.bytes.length != 10) return getError(errorCode.UNKNOWN_PAYLOAD);
                 parsedData.payload_type = payloadTypes.BUTTONS;
                 parsedData.payload_variant = 4;
+                input.payloadHeader = false;
                 break;
             default:
                 return { errors: []};
@@ -163,8 +164,10 @@ function parsePeopleCounter(input, parsedData){
 function parseButtons(input, parsedData){
     switch(parsedData.payload_variant){
         case 0x03:
-            parsedData.device_status = input.bytes[input.bytes.length - 4];
-            parsedData.battery_voltage = readUInt16BE(input.bytes, input.bytes.length - 3) / 100;
+            if(input.payloadHeader !== false){
+                parsedData.device_status = input.bytes[input.bytes.length - 4];
+                parsedData.battery_voltage = readUInt16BE(input.bytes, input.bytes.length - 3) / 100;
+            }
             parsedData.button_pressed = (input.bytes[input.bytes.length - 1] != 0) ? true : false;
             parsedData.button = {
                 a: (input.bytes[input.bytes.length - 1] & 0x01 == 0x01) ? true : false,
@@ -175,8 +178,10 @@ function parseButtons(input, parsedData){
             }
             break;
         case 0x04:
-            parsedData.device_status = input.bytes[input.bytes.length - 13];
-            parsedData.battery_voltage = readUInt16BE(input.bytes, input.bytes.length - 12) / 100;
+            if(input.payloadHeader !== false){
+                parsedData.device_status = input.bytes[input.bytes.length - 13];
+                parsedData.battery_voltage = readUInt16BE(input.bytes, input.bytes.length - 12) / 100;
+            }
             parsedData.button = {
                 a: readUInt16BE(input.bytes, input.bytes.length - 10),
                 b: readUInt16BE(input.bytes, input.bytes.length - 8),

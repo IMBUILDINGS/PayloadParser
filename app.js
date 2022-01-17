@@ -26,14 +26,14 @@ if(config.arguments.payload){
     
     let input = {fPort: parseInt(config.arguments.fport), bytes: Buffer.from(config.arguments.payload,'hex')};
     let parsedData = parser.decode(input);
-
+    
 	if(parsedData){
 		console.log(parsedData);
 	}else{
 		console.log('Payload structure unknown');
 	}
 }else if(config.arguments.base64){
-        console.log(`Translating payload: ${config.arguments.payload} as base64...\r\n`)
+        console.log(`Translating payload: ${config.arguments.base64} as base64...\r\n`)
         console.log(`Hex view: ${Buffer.from(config.arguments.base64,'base64').toString('hex')}`);
     
         let input = {fPort: parseInt(config.arguments.fport), bytes: Buffer.from(config.arguments.base64,'base64')};
