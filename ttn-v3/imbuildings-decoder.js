@@ -59,6 +59,12 @@ function decodeUplink(input){
                 parsedData.payload_type = payloadTypes.COMFORT_SENSOR;
                 parsedData.payload_variant = 3;
                 break;
+            case 24:
+                if(input.bytes.length != 12) return getError(errorCode.UNKNOWN_PAYLOAD);
+                parsedData.payload_type = payloadTypes.PEOPLE_COUNTER;
+                parsedData.payload_variant = 4;
+                input.payloadHeader = false;
+                break;
             case 26:
                 if(input.bytes.length != 13) return getError(errorCode.UNKNOWN_PAYLOAD);
 
@@ -113,6 +119,7 @@ function decodeUplink(input){
 
 function containsIMBHeader(payload){
     if(payload[0] == payloadTypes.COMFORT_SENSOR && payload[1] == 0x03 && payload.length == 20) return true;
+    if(payload[0] == payloadTypes.PEOPLE_COUNTER && payload[1] == 0x04 && payload.length == 24) return true;
     if(payload[0] == payloadTypes.PEOPLE_COUNTER && payload[1] == 0x06 && payload.length == 23) return true;
     if(payload[0] == payloadTypes.PEOPLE_COUNTER && payload[1] == 0x07 && payload.length == 15) return true;
     if(payload[0] == payloadTypes.PEOPLE_COUNTER && payload[1] == 0x08 && payload.length == 14) return true;
@@ -138,6 +145,27 @@ function parseComfortSensor(input, parsedData){
 
 function parsePeopleCounter(input, parsedData){
     switch(parsedData.payload_variant){
+        case 0x04:
+            if(input.payloadHeader !== false){
+                parsedData.device_id = toHEXString(input.bytes, 2, 6);
+                parsedData.device_status = input.bytes[8];
+                parsedData.battery_voltage = readUInt16BE(input.bytes, 9) / 100;
+                parsedData.rssi = readInt8(input.bytes, 11);
+            }
+            let datetime = Date.UTC(
+                unbcd(input.bytes[input.bytes.length - 12]) * 100 + unbcd(input.bytes[input.bytes.length - 11]),
+                unbcd(input.bytes[input.bytes.length - 10]) - 1,
+                unbcd(input.bytes[input.bytes.length - 9]),
+                unbcd(input.bytes[input.bytes.length - 8]),
+                unbcd(input.bytes[input.bytes.length - 7]),
+                unbcd(input.bytes[input.bytes.length - 6])
+            );
+            
+            parsedData.datetime = new Date(datetime).toISOString();
+            parsedData.counter_a = readUInt16BE(input.bytes, input.bytes.length - 5);
+            parsedData.counter_b = readUInt16BE(input.bytes, input.bytes.length - 3);
+            parsedData.sensor_status = input.bytes[input.bytes.length - 1];
+            break;
         case 0x06:
             parsedData.device_status = input.bytes[input.bytes.length - 13];
             parsedData.battery_voltage = readUInt16BE(input.bytes, input.bytes.length - 12) / 100;
