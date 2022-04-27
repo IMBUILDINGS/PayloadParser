@@ -53,6 +53,12 @@ function decodeUplink(input){
                 parsedData.payload_type = payloadTypes.DOWNLINK;
                 parsedData.payload_variant = 0x01;
                 break;
+            case 11:
+                if(input.bytes.length != 7) return getError(errorCode.UNKNOWN_PAYLOAD);
+                parsedData.payload_type = payloadTypes.COMFORT_SENSOR;
+                parsedData.payload_variant = 1;
+                input.payloadHeader = false;
+                break;
             case 13:
                 if(input.bytes.length != 7) return getError(errorCode.UNKNOWN_PAYLOAD);
 
@@ -118,6 +124,7 @@ function decodeUplink(input){
 }
 
 function containsIMBHeader(payload){
+    if(payload[0] == payloadTypes.COMFORT_SENSOR && payload[1] == 0x01 && payload.length == 19) return true;
     if(payload[0] == payloadTypes.COMFORT_SENSOR && payload[1] == 0x03 && payload.length == 20) return true;
     if(payload[0] == payloadTypes.PEOPLE_COUNTER && payload[1] == 0x04 && payload.length == 24) return true;
     if(payload[0] == payloadTypes.PEOPLE_COUNTER && payload[1] == 0x06 && payload.length == 23) return true;
@@ -131,6 +138,18 @@ function containsIMBHeader(payload){
 
 function parseComfortSensor(input, parsedData){
     switch(parsedData.payload_variant){
+        case 0x01:
+            if(input.payloadHeader !== false){
+                parsedData.device_id = toHEXString(input.bytes, 2, 6);
+                parsedData.device_status = input.bytes[8];
+                parsedData.battery_voltage = readUInt16BE(input.bytes, 9) / 100;
+                parsedData.rssi = readInt8(input.bytes, 11);
+            }
+            parsedData.temperature = readUInt16BE(input.bytes, input.bytes.length - 7) / 100;
+            parsedData.humidity = readUInt16BE(input.bytes, input.bytes.length - 5) / 100;
+            parsedData.CO2 = readUInt16BE(input.bytes, input.bytes.length - 3);
+            parsedData.presence = (input.bytes[input.bytes.length - 1] == 1) ? true : false;
+            break;
         case 0x03:
             parsedData.device_status = input.bytes[input.bytes.length - 10];
             parsedData.battery_voltage = readUInt16BE(input.bytes, input.bytes.length - 9) / 100;
