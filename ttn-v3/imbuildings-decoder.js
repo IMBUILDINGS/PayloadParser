@@ -1,5 +1,6 @@
 const payloadTypes = {
     COMFORT_SENSOR:                 0x01,
+    DESK_SENSOR:                    0x01,
     PEOPLE_COUNTER:                 0x02,
     BUTTONS:                        0x03,
     PULSE_COUNTER:                  0x04,
@@ -61,9 +62,23 @@ function decodeUplink(input){
                 break;
             case 13:
                 if(input.bytes.length != 7) return getError(errorCode.UNKNOWN_PAYLOAD);
-
                 parsedData.payload_type = payloadTypes.COMFORT_SENSOR;
                 parsedData.payload_variant = 3;
+                break;
+            case 16:
+                if(input.bytes.length != 1) return getError(errorCode.UNKNOWN_PAYLOAD);
+                parsedData.payload_type = payloadTypes.DESK_SENSOR;
+                parsedData.payload_variant = 6;
+                break;
+            case 17:
+                if(input.bytes.length != 1) return getError(errorCode.UNKNOWN_PAYLOAD);
+                parsedData.payload_type = payloadTypes.DESK_SENSOR;
+                parsedData.payload_variant = 7;
+                break;
+            case 18:
+                if(input.bytes.length != 1) return getError(errorCode.UNKNOWN_PAYLOAD);
+                parsedData.payload_type = payloadTypes.DESK_SENSOR;
+                parsedData.payload_variant = 8;
                 break;
             case 24:
                 if(input.bytes.length != 12) return getError(errorCode.UNKNOWN_PAYLOAD);
@@ -101,6 +116,7 @@ function decodeUplink(input){
                 parsedData.payload_variant = 4;
                 input.payloadHeader = false;
                 break;
+            //case 35: This one is not implemented. This is payload for NB-IoT device only
             default:
                 return { errors: []};
         }
@@ -126,12 +142,17 @@ function decodeUplink(input){
 function containsIMBHeader(payload){
     if(payload[0] == payloadTypes.COMFORT_SENSOR && payload[1] == 0x01 && payload.length == 19) return true;
     if(payload[0] == payloadTypes.COMFORT_SENSOR && payload[1] == 0x03 && payload.length == 20) return true;
+    if(payload[0] == payloadTypes.DESK_SENSOR && payload[1] == 0x06 && payload.length == 14) return true;
+    if(payload[0] == payloadTypes.DESK_SENSOR && payload[1] == 0x07 && payload.length == 14) return true;
+    if(payload[0] == payloadTypes.DESK_SENSOR && payload[1] == 0x08 && payload.length == 14) return true;
     if(payload[0] == payloadTypes.PEOPLE_COUNTER && payload[1] == 0x04 && payload.length == 24) return true;
     if(payload[0] == payloadTypes.PEOPLE_COUNTER && payload[1] == 0x06 && payload.length == 23) return true;
     if(payload[0] == payloadTypes.PEOPLE_COUNTER && payload[1] == 0x07 && payload.length == 15) return true;
     if(payload[0] == payloadTypes.PEOPLE_COUNTER && payload[1] == 0x08 && payload.length == 14) return true;
     if(payload[0] == payloadTypes.BUTTONS && payload[1] == 0x03 && payload.length == 14) return true;
     if(payload[0] == payloadTypes.BUTTONS && payload[1] == 0x04 && payload.length == 23) return true;
+    if(payload[0] == payloadTypes.BUTTONS && payload[1] == 0x05 && payload.length == 16) return true;
+    if(payload[0] == payloadTypes.BUTTONS && payload[1] == 0x06 && payload.length == 25) return true;
 
     return false;
 }
@@ -157,6 +178,21 @@ function parseComfortSensor(input, parsedData){
             parsedData.humidity = readUInt16BE(input.bytes, input.bytes.length - 5) / 100;
             parsedData.CO2 = readUInt16BE(input.bytes, input.bytes.length - 3);
             parsedData.presence = (input.bytes[input.bytes.length - 1] == 1) ? true : false;
+            break;
+        case 0x06:
+            parsedData.device_status = input.bytes[input.bytes.length - 4];
+            parsedData.battery_voltage = readUInt16BE(input.bytes, input.bytes.length - 3) / 100;
+            parsedData.event = input.bytes[input.bytes.length - 1];
+            break;
+        case 0x07:
+            parsedData.device_status = input.bytes[input.bytes.length - 4];
+            parsedData.battery_voltage = readUInt16BE(input.bytes, input.bytes.length - 3) / 100;
+            parsedData.percentage = input.bytes[input.bytes.length - 1];
+            break;
+        case 0x08:
+            parsedData.device_status = input.bytes[input.bytes.length - 4];
+            parsedData.battery_voltage = readUInt16BE(input.bytes, input.bytes.length - 3) / 100;
+            parsedData.minutes = input.bytes[input.bytes.length - 1];
             break;
     }
 
@@ -217,11 +253,11 @@ function parseButtons(input, parsedData){
             }
             parsedData.button_pressed = (input.bytes[input.bytes.length - 1] != 0) ? true : false;
             parsedData.button = {
-                a: (input.bytes[input.bytes.length - 1] & 0x01 == 0x01) ? true : false,
-                b: (input.bytes[input.bytes.length - 1] & 0x02 == 0x02) ? true : false,
-                c: (input.bytes[input.bytes.length - 1] & 0x04 == 0x04) ? true : false,
-                d: (input.bytes[input.bytes.length - 1] & 0x08 == 0x08) ? true : false,
-                e: (input.bytes[input.bytes.length - 1] & 0x10 == 0x10) ? true : false
+                a: ((input.bytes[input.bytes.length - 1] & 0x01) == 0x01) ? true : false,
+                b: ((input.bytes[input.bytes.length - 1] & 0x02) == 0x02) ? true : false,
+                c: ((input.bytes[input.bytes.length - 1] & 0x04) == 0x04) ? true : false,
+                d: ((input.bytes[input.bytes.length - 1] & 0x08) == 0x08) ? true : false,
+                e: ((input.bytes[input.bytes.length - 1] & 0x10) == 0x10) ? true : false
             }
             break;
         case 0x04:
@@ -237,6 +273,38 @@ function parseButtons(input, parsedData){
                 e: readUInt16BE(input.bytes, input.bytes.length - 2)
             }
             break;
+            case 0x05:
+                if(input.payloadHeader !== false){
+                    parsedData.device_status = input.bytes[input.bytes.length - 6];
+                    parsedData.battery_voltage = readUInt16BE(input.bytes, input.bytes.length - 5) / 100;
+                }
+                parsedData.button_pressed = (input.bytes[input.bytes.length - 3] != 0) ? true : false;
+                parsedData.button = {
+                    a: ((input.bytes[input.bytes.length - 3] & 0x01) == 0x01) ? true : false,
+                    b: ((input.bytes[input.bytes.length - 3] & 0x02) == 0x02) ? true : false,
+                    c: ((input.bytes[input.bytes.length - 3] & 0x04) == 0x04) ? true : false,
+                    d: ((input.bytes[input.bytes.length - 3] & 0x08) == 0x08) ? true : false,
+                    e: ((input.bytes[input.bytes.length - 3] & 0x10) == 0x10) ? true : false
+                }
+                parsedData.rssi = readInt8(input.bytes, input.bytes.length - 2);
+                parsedData.CELevel = input.bytes[input.bytes.length - 1];
+                break;
+            case 0x06:
+                if(input.payloadHeader !== false){
+                    parsedData.device_status = input.bytes[input.bytes.length - 15];
+                    parsedData.battery_voltage = readUInt16BE(input.bytes, input.bytes.length - 14) / 100;
+                }
+                parsedData.button = {
+                    a: readUInt16BE(input.bytes, input.bytes.length - 12),
+                    b: readUInt16BE(input.bytes, input.bytes.length - 10),
+                    c: readUInt16BE(input.bytes, input.bytes.length - 8),
+                    d: readUInt16BE(input.bytes, input.bytes.length - 6),
+                    e: readUInt16BE(input.bytes, input.bytes.length - 4)
+                }
+
+                parsedData.rssi = readInt8(input.bytes. input.bytes.length - 2);
+                parsedData.CELevel = input.bytes[input.bytes.length - 1];
+                break;            
     }
 }
 
