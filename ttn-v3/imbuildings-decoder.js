@@ -302,7 +302,7 @@ function parseButtons(input, parsedData){
                     e: readUInt16BE(input.bytes, input.bytes.length - 4)
                 }
 
-                parsedData.rssi = readInt8(input.bytes. input.bytes.length - 2);
+                parsedData.rssi = readInt8(input.bytes, input.bytes.length - 2);
                 parsedData.CELevel = input.bytes[input.bytes.length - 1];
                 break;            
     }

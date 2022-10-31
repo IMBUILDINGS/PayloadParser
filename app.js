@@ -40,11 +40,11 @@ if(config.arguments.payload){
         let parsedData = parser.decode(input);
         if(parsedData){
             console.log(parsedData);
-        }else{
+        } else{
             console.log('Payload structure unknown');
         }
 }else{
-	console.log(`
+    console.log(`
 Please run this applition with the following argument:
 
 --payload= Enter your payload in as a HEX string
