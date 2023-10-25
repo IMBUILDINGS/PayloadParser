@@ -142,6 +142,7 @@ function decodeUplink(input){
 function containsIMBHeader(payload){
     if(payload[0] == payloadTypes.COMFORT_SENSOR && payload[1] == 0x01 && payload.length == 19) return true;
     if(payload[0] == payloadTypes.COMFORT_SENSOR && payload[1] == 0x03 && payload.length == 20) return true;
+    if(payload[0] == payloadTypes.COMFORT_SENSOR && payload[1] == 0x04 && payload.length == 18) return true;
     if(payload[0] == payloadTypes.DESK_SENSOR && payload[1] == 0x06 && payload.length == 14) return true;
     if(payload[0] == payloadTypes.DESK_SENSOR && payload[1] == 0x07 && payload.length == 14) return true;
     if(payload[0] == payloadTypes.DESK_SENSOR && payload[1] == 0x08 && payload.length == 14) return true;
@@ -179,6 +180,17 @@ function parseComfortSensor(input, parsedData){
             parsedData.CO2 = readUInt16BE(input.bytes, input.bytes.length - 3);
             parsedData.presence = (input.bytes[input.bytes.length - 1] == 1) ? true : false;
             break;
+        case 0x04:
+            if(input.payloadHeader !== false){
+                parsedData.device_id = toHEXString(input.bytes, 2, 6);
+            }
+            parsedData.device_status = input.bytes[input.bytes.length - 10];
+            parsedData.battery_voltage = readUInt16BE(input.bytes, input.bytes.length - 9) / 100;
+            parsedData.rssi = readInt8(input.bytes, input.bytes.length - 7);
+            parsedData.min_temperature = readUInt16BE(input.bytes, input.bytes.length - 6) / 100;
+            parsedData.max_temperature = readUInt16BE(input.bytes, input.bytes.length - 4) / 100;
+            parsedData.temperature = readUInt16BE(input.bytes, input.bytes.length - 2) / 100;
+            break;
         case 0x06:
             parsedData.device_status = input.bytes[input.bytes.length - 4];
             parsedData.battery_voltage = readUInt16BE(input.bytes, input.bytes.length - 3) / 100;
@@ -193,6 +205,27 @@ function parseComfortSensor(input, parsedData){
             parsedData.device_status = input.bytes[input.bytes.length - 4];
             parsedData.battery_voltage = readUInt16BE(input.bytes, input.bytes.length - 3) / 100;
             parsedData.minutes = input.bytes[input.bytes.length - 1];
+            break;
+        case 0x09:
+            parsedData.device_status = input.bytes[input.bytes.length - 6];
+            parsedData.battery_voltage = readUInt16BE(input.bytes, input.bytes.length - 5) / 100;
+            parsedData.event = input.bytes[input.bytes.length - 3];
+            parsedData.rssi = readInt8(input.bytes, input.bytes.length - 2);
+            parsedData.ce_level = input.bytes[input.bytes.length - 1];
+            break;
+        case 0x0A:
+            parsedData.device_status = input.bytes[input.bytes.length - 6];
+            parsedData.battery_voltage = readUInt16BE(input.bytes, input.bytes.length - 5) / 100;
+            parsedData.percentage = input.bytes[input.bytes.length - 3];
+            parsedData.rssi = readInt8(input.bytes, input.bytes.length - 2);
+            parsedData.ce_level = input.bytes[input.bytes.length - 1];
+            break;
+        case 0x0B:
+            parsedData.device_status = input.bytes[input.bytes.length - 6];
+            parsedData.battery_voltage = readUInt16BE(input.bytes, input.bytes.length - 5) / 100;
+            parsedData.minutes = input.bytes[input.bytes.length - 3];
+            parsedData.rssi = readInt8(input.bytes, input.bytes.length - 2);
+            parsedData.ce_level = input.bytes[input.bytes.length - 1];
             break;
     }
 
@@ -241,6 +274,18 @@ function parsePeopleCounter(input, parsedData){
             parsedData.battery_voltage = readUInt16BE(input.bytes, input.bytes.length - 3) / 100;
             parsedData.sensor_status = input.bytes[input.bytes.length - 1];
             break;
+        case 0x09:
+            parsedData.device_status = input.bytes[input.bytes.length - 15];
+            parsedData.battery_voltage = readUInt16BE(input.bytes, input.bytes.length - 14) / 100;
+            parsedData.counter_a = readUInt16BE(input.bytes, input.bytes.length - 12);
+            parsedData.counter_b = readUInt16BE(input.bytes, input.bytes.length - 10);
+            parsedData.sensor_status = input.bytes[input.bytes.length - 8];
+            parsedData.total_counter_a = readUInt16BE(input.bytes, input.bytes.length - 7);
+            parsedData.total_counter_b = readUInt16BE(input.bytes, input.bytes.length - 5);
+            parsedData.payload_counter = input.bytes[input.bytes.length - 2];
+            parsedData.rssi = readInt8(input.bytes, input.bytes.length - 2);
+            parsedData.ce_level = input.bytes[input.bytes.length - 1];
+            break;
     }
 }
 
@@ -287,7 +332,7 @@ function parseButtons(input, parsedData){
                     e: ((input.bytes[input.bytes.length - 3] & 0x10) == 0x10) ? true : false
                 }
                 parsedData.rssi = readInt8(input.bytes, input.bytes.length - 2);
-                parsedData.CELevel = input.bytes[input.bytes.length - 1];
+                parsedData.ce_level = input.bytes[input.bytes.length - 1];
                 break;
             case 0x06:
                 if(input.payloadHeader !== false){
@@ -303,7 +348,7 @@ function parseButtons(input, parsedData){
                 }
 
                 parsedData.rssi = readInt8(input.bytes, input.bytes.length - 2);
-                parsedData.CELevel = input.bytes[input.bytes.length - 1];
+                parsedData.ce_level = input.bytes[input.bytes.length - 1];
                 break;            
     }
 }
