@@ -38,12 +38,14 @@ const command = {
     REJOIN:                         0x02,
     COUNTER_PRESET:                 0x03,
     SAVE:                           0x04,
-    BUTTON_PRESET:                  0x05
+    BUTTON_PRESET:                  0x05,
+    NBIOT_INFO:                     0x06,
+    DEVICE_INFORMATION:             0x07
 }
 
 function decodeUplink(input){
     let parsedData = {};
-    if(!containsIMBHeader(input.bytes)){
+    if(input.fPort && !containsIMBHeader(input.bytes)){
         //When payload doesn't contain IMBuildings header
         //Assumes that payload is transmitted on specific recommended fport
         //e.g. payload type 2 variant 6 on FPort 26, type 2 variant 7 on FPort 27 and so on...
@@ -104,6 +106,11 @@ function decodeUplink(input){
                 parsedData.payload_type = payloadTypes.PEOPLE_COUNTER;
                 parsedData.payload_variant = 8;
                 break;
+            case 212:
+                if(input.bytes.length != 8) return getError(errorCode.UNKNOWN_PAYLOAD);
+                parsedData.payload_type = payloadTypes.PEOPLE_COUNTER;
+                parsedData.payload_variant = 12;
+                break;
             case 33:
                 if(input.bytes.length != 1) return getError(errorCode.UNKNOWN_PAYLOAD);
                 parsedData.payload_type = payloadTypes.BUTTONS;
@@ -129,7 +136,7 @@ function decodeUplink(input){
     switch(parsedData.payload_type){
         case payloadTypes.COMFORT_SENSOR: parseComfortSensor(input, parsedData); break;
         case payloadTypes.PEOPLE_COUNTER: parsePeopleCounter(input, parsedData); break;
-        case payloadTypes.DOWNLINK:       parsedData = parseDownlinkResponse(input.bytes); break;
+        case payloadTypes.DOWNLINK:       parseDownlink(input, parsedData); break;
         case payloadTypes.BUTTONS:        parseButtons(input, parsedData); break;
         default:
             return getError(errorCode.UNKNOWN_PAYLOAD_TYPE);
@@ -153,6 +160,8 @@ function containsIMBHeader(payload){
     if(payload[0] == payloadTypes.BUTTONS && payload[1] == 0x04 && payload.length == 23) return true;
     if(payload[0] == payloadTypes.BUTTONS && payload[1] == 0x05 && payload.length == 16) return true;
     if(payload[0] == payloadTypes.BUTTONS && payload[1] == 0x06 && payload.length == 25) return true;
+
+    if(payload[0] == payloadTypes.DOWNLINK && payload[1] == 0x01 && payload.length >= 4) return true;
 
     return false;
 }
@@ -241,6 +250,27 @@ function parsePeopleCounter(input, parsedData){
             parsedData.battery_voltage = readUInt16BE(input.bytes, input.bytes.length - 3) / 100;
             parsedData.sensor_status = input.bytes[input.bytes.length - 1];
             break;
+        case 0x09:
+            parsedData.device_status = input.bytes[input.bytes.length - 15];
+            parsedData.battery_voltage = readUInt16BE(input.bytes, input.bytes.length - 14) / 100;
+            parsedData.counter_a = readUInt16BE(input.bytes, input.bytes.length - 12);
+            parsedData.counter_b = readUInt16BE(input.bytes, input.bytes.length - 10);
+            parsedData.sensor_status = input.bytes[input.bytes.length - 8];
+            parsedData.total_counter_a = readUInt16BE(input.bytes, input.bytes.length - 7);
+            parsedData.total_counter_b = readUInt16BE(input.bytes, input.bytes.length - 5);
+            parsedData.payload_counter = input.bytes[input.bytes.length - 3];
+            parsedData.rssi = readInt8(input.bytes, input.bytes.length - 2);
+            parsedData.ce_level = input.bytes[input.bytes.length - 1];
+            break;
+        case 0x0C:
+            parsedData.device_status = input.bytes[input.bytes.length - 8];
+            parsedData.battery_voltage = readUInt16BE(input.bytes, input.bytes.length - 7) / 100;
+            parsedData.sensor_status = input.bytes[input.bytes.length - 5];
+            parsedData.sensor_activity = {
+                on: readUInt16BE(input.bytes, input.bytes.length - 4),
+                off: readUInt16BE(input.bytes, input.bytes.length - 2)
+            }
+            break;
     }
 }
 
@@ -306,6 +336,21 @@ function parseButtons(input, parsedData){
                 parsedData.CELevel = input.bytes[input.bytes.length - 1];
                 break;            
     }
+}
+
+function parseDownlink(input, parsedData){
+    //Not implemented yet
+    console.log(input);
+    if(!input.bytes[1] == 0x01) return;
+
+    delete parsedData.device_id;
+
+    // let index = 2;
+    // while(index < input.bytes.length){
+    //     const recordLength = input.bytes[index];
+    //     console.log(index);
+    //     index += recordLength;
+    // }
 }
 
 //Helper functions

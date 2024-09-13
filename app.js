@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 'use strict';
 let parser = require('./ttn-v3/imbuildings-decoder');
 let config = {
