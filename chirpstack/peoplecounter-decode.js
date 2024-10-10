@@ -41,6 +41,15 @@ function Decode(fPort, bytes, variables) {
                 d.payload_variant = 8;
 
                 break;
+            case 212:
+                if(p.bytes.length != 8){
+                    return { errors: ['Unable to detect correct payload. Please check your device configuration']};
+                }
+                
+                d.payload_type = 2;
+                d.payload_variant = 12;
+                
+                break;
             default:
                 return { errors: ['Unable to detect correct payload. Please check your device configuration']};
         }
@@ -71,6 +80,15 @@ function Decode(fPort, bytes, variables) {
             d.battery_voltage = readUInt16BE(p.bytes, p.bytes.length - 3) / 100;
             d.sensor_status = p.bytes[p.bytes.length - 1];
             break;
+        case 0x0C:
+            d.device_status = p.bytes[p.bytes.length - 8];
+            d.battery_voltage = readUInt16BE(inpput.bytes, p.bytes.length - 7) / 100;
+            d.sensor_status = p.bytes[p.bytes.length - 5];
+            d.sensor_activity = {
+                on: readUInt16BE(p.bytes, p.bytes.length - 4),
+                off: readUInt16BE(p.bytes, p.bytes.length - 2)
+            }
+            break;
     }
   
   return d;
@@ -80,7 +98,7 @@ function containsIMBHeader(p){
     if(p[0] == 0x02 && p[1] == 0x06 && p.length == 23) return true;
     if(p[0] == 0x02 && p[1] == 0x07 && p.length == 15) return true;
     if(p[0] == 0x02 && p[1] == 0x08 && p.length == 14) return true;
-
+    if(p[0] == 0x02 && p[1] == 0x0C && p.length == 18) return true;
     return false;
 }
 
