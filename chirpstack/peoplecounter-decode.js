@@ -48,7 +48,7 @@ function Decode(fPort, bytes, variables) {
                 
                 d.payload_type = 2;
                 d.payload_variant = 12;
-                
+
                 break;
             default:
                 return { errors: ['Unable to detect correct payload. Please check your device configuration']};
@@ -82,7 +82,7 @@ function Decode(fPort, bytes, variables) {
             break;
         case 0x0C:
             d.device_status = p.bytes[p.bytes.length - 8];
-            d.battery_voltage = readUInt16BE(inpput.bytes, p.bytes.length - 7) / 100;
+            d.battery_voltage = readUInt16BE(input.bytes, p.bytes.length - 7) / 100;
             d.sensor_status = p.bytes[p.bytes.length - 5];
             d.sensor_activity = {
                 on: readUInt16BE(p.bytes, p.bytes.length - 4),
