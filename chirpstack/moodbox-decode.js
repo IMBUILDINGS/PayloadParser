@@ -1,8 +1,11 @@
 // Decode decodes an array of bytes into an object.
 //  - fPort contains the LoRaWAN fPort number
 //  - bytes is an array of bytes, e.g. [225, 230, 255, 0]
-function Decode(fPort, bytes, variables) {
+function decodeUplink(input) {
   var d = {};
+  var fPort = input.fPort;
+  var bytes = input.bytes;
+  var variables = input.variables;
 
   	  var p = {
         bytes: bytes,
@@ -65,7 +68,7 @@ function Decode(fPort, bytes, variables) {
             break;
     }
   
-  return d;
+  return { data: d };
 }
 
 function containsIMBHeader(p){
